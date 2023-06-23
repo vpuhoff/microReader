@@ -36,6 +36,9 @@
 #include <GyverPortal.h>                      // Либа веб морды
 #include <GyverOLED.h>                        // Либа олед-дисплея
 #include <EncButton.h>                        // Либа кнопок
+#include <ESPDateTime.h>                      // Либа для работы с временем
+#include "sha1.h"
+#include "TOTP.h"
 /* =========================================== */
 /* ============ Список объектов ============== */
 GyverPortal ui(&LittleFS);                    // Портал
@@ -60,7 +63,27 @@ int batMv = 3000;                             // Напряжение питан
 uint32_t uiTimer = 0;                         // Таймер таймаута дисплея
 uint32_t batTimer = 0;                        // Таймер опроса АКБ
 /* =========================================== */
-
+/* ===== Функции для работы с временем ======= */
+// The shared secret is MyLegoDoor
+uint8_t hmacKey[] = {0x4d, 0x79, 0x4c, 0x65, 0x67, 0x6f, 0x44, 0x6f, 0x6f, 0x72};
+TOTP totp = TOTP(hmacKey, 10);
+char code[7];
+void setupDateTime() {
+  DateTime.setTimeZone("MSK-3");
+  DateTime.begin(/* timeout param */);
+  // DateTime.setServer("asia.pool.ntp.org");
+  if (!DateTime.isTimeValid()) {
+    oled.print("Failed to get time from server.");
+    oled.setCursor(0, 6); oled.print("Failed to get time from server."); 
+  }else{
+    oled.setCursor(0, 6); oled.print("Datetime: "); oled.print(DateTime.toString()); oled.print(' ');
+    //DateTimeParts p = DateTime.getParts();
+    long GMT = TimeElapsed();
+    char* newCode = totp.getCode(GMT); 
+    oled.print(newCode);
+  }
+}
+/* =========================================== */
 /* ============================ setup + loop ============================= */
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);              // Пара подмигиваний
@@ -246,7 +269,9 @@ void drawStaMenu(void) {                            // Рисуем STA меню
   oled.setCursor(0, 4); oled.print("LocalIP:"); oled.print(WiFi.localIP());   // Выводим IP
   checkBatteryCharge();                             // Проверка напряжение аккума
   drawBatteryCharge();                              // Рисуем индикатор
+  setupDateTime();                                  // Обновляем дату из сети
   oled.update();                                    // Выводим картинку
+  
 }
 
 void drawApMenu(void) {                             // Рисуем AP меню
